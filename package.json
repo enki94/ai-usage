@@ -1,0 +1,20 @@
+{
+  "name": "ai-usage",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "tauri": "node scripts/tauri.mjs",
+    "dev": "node scripts/tauri.mjs dev",
+    "build": "node scripts/tauri.mjs build",
+    "demo": "node scripts/preview.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "test:rust": "node scripts/cargo.mjs test",
+    "check": "node scripts/cargo.mjs check",
+    "fmt": "node scripts/cargo.mjs fmt",
+    "dev:demo": "node scripts/tauri.mjs dev -- --demo"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.0.0"
+  }
+}

@@ -1,0 +1,21 @@
+# Dependencies and local development tools
+node_modules/
+.tools/
+
+# Build outputs and generated Tauri schemas
+src-tauri/target/
+src-tauri/gen/schemas/
+
+# Local verification files and logs
+.verify/
+*.log
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# OS metadata
+.DS_Store
+Thumbs.db
+Desktop.ini

@@ -1,0 +1,8 @@
+{
+  "identifier": "com.aiusage.windows",
+  "bundle": {
+    "targets": [
+      "nsis"
+    ]
+  }
+}
