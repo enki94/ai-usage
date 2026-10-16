@@ -205,9 +205,12 @@ mod tests {
     }
     #[test]
     fn antigravity_order_and_maximum() {
-        let windows = parse(&json!({"groups":[{"displayName":"Gemini","buckets":[{"window":"weekly","remainingFraction":0.2},{"window":"5h","remainingFraction":0.75},{"window":"other","remainingFraction":0}]},{"displayName":"Claude","buckets":[{"window":"5h","remainingFraction":0.1}]}]}), Provider::Antigravity).unwrap();
-        assert_eq!(windows.len(), 3);
+        let windows = parse(&json!({"groups":[{"displayName":"Gemini","buckets":[{"window":"weekly","remainingFraction":0.2},{"window":"5h","remainingFraction":0.75},{"window":"other","remainingFraction":0}]},{"displayName":"Claude","buckets":[{"window":"5h","remainingFraction":0.1}]},{"displayName":"Gemini 4 Argon","buckets":[{"bucketId":"gemini-argon-wtu-weekly","window":"weekly","remainingFraction":0.82}]}]}), Provider::Antigravity).unwrap();
+        assert_eq!(windows.len(), 4);
         assert_eq!(windows[0].used, 25.0);
+        assert_eq!(windows[3].group.as_deref(), Some("Gemini 4 Argon"));
+        assert_eq!(windows[3].label, "주간");
+        assert!((windows[3].used - 18.0).abs() < 1e-9);
         assert_eq!(
             Snapshot {
                 windows,

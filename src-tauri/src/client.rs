@@ -99,11 +99,11 @@ async fn antigravity(client: &Client, account: &str) -> Result<Vec<UsageWindow>,
     let access = access.ok_or("Antigravity access_token을 찾지 못했습니다.")?;
     let mut errors = vec![];
     for host in [
-        "cloudcode-pa.googleapis.com",
         "daily-cloudcode-pa.googleapis.com",
+        "cloudcode-pa.googleapis.com",
     ] {
         let response = request(client.post(format!("https://{host}/v1internal:retrieveUserQuotaSummary"))
-            .bearer_auth(&access).header("User-Agent", format!("antigravity/cli/1.2.14 (aidev_client; os_type={}; arch={}; cl=990662481; auth_method=consumer)", if cfg!(target_os = "macos") { "darwin" } else { std::env::consts::OS }, std::env::consts::ARCH)).json(&json!({}))).await;
+            .bearer_auth(&access).header("User-Agent", format!("antigravity/cli/1.3.6 (aidev_client; os_type={}; arch={}; cl=999748552; auth_method=consumer)", if cfg!(target_os = "macos") { "darwin" } else { std::env::consts::OS }, std::env::consts::ARCH)).json(&json!({}))).await;
         match response.and_then(|json| usage::parse(&json, Provider::Antigravity)) {
             Ok(windows) => return Ok(windows),
             Err(error) => errors.push(error),

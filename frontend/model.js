@@ -1,7 +1,7 @@
 export const providers = [
-  { key: 'claude', name: 'Claude', short: 'C', color: '#d8a185', description: 'Claude Code' },
-  { key: 'codex', name: 'Codex', short: 'X', color: '#8bbda8', description: 'Codex CLI' },
-  { key: 'antigravity', name: 'Antigravity', short: 'A', color: '#91aef3', description: '모델 그룹별 한도' },
+  { key: 'claude', name: 'Claude', short: 'C', color: '#b85a2a', description: 'Claude Code' },
+  { key: 'codex', name: 'Codex', short: 'X', color: '#1f7a5a', description: 'Codex CLI' },
+  { key: 'antigravity', name: 'Antigravity', short: 'A', color: '#2b5fd9', description: '모델 그룹별 한도' },
 ];
 export function bounded(value) { return Number.isFinite(value) ? Math.min(100, Math.max(0, value)) : 0; }
 export function headline(snapshot) {
@@ -38,7 +38,10 @@ export function demoView(now = Date.now()) {
     windows: [
       { id: '5h', group: index === 2 ? 'Gemini' : null, label: '5시간', used: [24.5, 37, 25][index], resetAt: new Date(now + 2 * 3600000).toISOString() },
       { id: 'weekly', group: index === 2 ? 'Gemini' : null, label: '주간', used: [63, 48, 31][index], resetAt: new Date(now + 3 * 86400000).toISOString() },
-      ...(index === 2 ? [{ id: 'claude-5h', group: 'Claude', label: '5시간', used: 72, resetAt: new Date(now + 4 * 3600000).toISOString() }] : []),
+      ...(index === 2 ? [
+        { id: 'claude-5h', group: 'Claude', label: '5시간', used: 72, resetAt: new Date(now + 4 * 3600000).toISOString() },
+        { id: 'argon-weekly', group: 'Gemini 4 Argon', label: '주간', used: 18, resetAt: new Date(now + 5 * 86400000).toISOString() },
+      ] : []),
     ], updatedAt: new Date(now).toISOString(), error: null, isLoading: false,
   }]));
   return { snapshots, settings: { interval: 0, selection: 'all' }, refreshing: false, launchAtLogin: false, settingsError: null, title: title(snapshots), demo: true };

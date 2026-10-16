@@ -35,5 +35,5 @@ test('preview explicitly marks sample data and uses group maximum', () => {
   const sample = demoView(0);
   assert.equal(sample.demo, true); assert.equal(sample.launchAtLogin, false);
   assert.equal(sample.title, 'C 25%  X 37%  A 72%');
-  assert.equal(sample.snapshots.antigravity.windows.length, 3);
+  assert.equal(sample.snapshots.antigravity.windows.length, 4);
 });

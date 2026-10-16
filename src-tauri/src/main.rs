@@ -80,7 +80,7 @@ fn demo_windows(provider: Provider) -> Vec<UsageWindow> {
     } else {
         None
     };
-    vec![
+    let mut windows = vec![
         UsageWindow {
             id: "five_hour".into(),
             group: group.clone(),
@@ -99,7 +99,17 @@ fn demo_windows(provider: Provider) -> Vec<UsageWindow> {
             used: 63.0,
             reset_at: Some(chrono::Utc::now() + chrono::Duration::days(3)),
         },
-    ]
+    ];
+    if provider == Provider::Antigravity {
+        windows.push(UsageWindow {
+            id: "argon_weekly".into(),
+            group: Some("Gemini 4 Argon".into()),
+            label: "주간".into(),
+            used: 18.0,
+            reset_at: Some(chrono::Utc::now() + chrono::Duration::days(5)),
+        });
+    }
+    windows
 }
 #[tauri::command]
 fn get_state(app: AppHandle) -> AppView {

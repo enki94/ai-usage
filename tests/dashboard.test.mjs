@@ -39,6 +39,7 @@ test('dashboard renders provider identity, windows and sample notice', async () 
   assert.equal(ids.left.children.length, 2); assert.equal(ids.right.children.length, 1);
   assert.match(document.title, /C 25%  X 37%  A 72%/);
   assert.ok(texts(ids.right).includes('Claude · 5시간'));
+  assert.ok(texts(ids.right).includes('Gemini 4 Argon · 주간'));
   assert.equal(ids.startup.disabled, true);
   assert.match(ids.notice.textContent, /예시 데이터/);
 });
