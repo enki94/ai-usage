@@ -5,12 +5,14 @@ use std::path::Path;
 pub struct Settings {
     pub interval: u64,
     pub selection: String,
+    pub widget: bool,
 }
 impl Default for Settings {
     fn default() -> Self {
         Self {
             interval: 0,
             selection: "all".into(),
+            widget: false,
         }
     }
 }

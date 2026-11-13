@@ -4,11 +4,15 @@ export const providers = [
   { key: 'antigravity', name: 'Antigravity', short: 'A', color: '#2b5fd9', description: '모델 그룹별 한도' },
 ];
 export function bounded(value) { return Number.isFinite(value) ? Math.min(100, Math.max(0, value)) : 0; }
-export function headline(snapshot) {
+export function headlineWindow(snapshot) {
   const windows = snapshot?.windows ?? [];
   const short = windows.filter(w => w.label === '5시간');
   const selected = short.length ? short : windows;
-  return selected.length ? Math.max(...selected.map(w => bounded(w.used))) : null;
+  return selected.reduce((best, w) => (!best || bounded(w.used) > bounded(best.used) ? w : best), null);
+}
+export function headline(snapshot) {
+  const window = headlineWindow(snapshot);
+  return window ? bounded(window.used) : null;
 }
 export function statusText(snapshot) {
   const value = headline(snapshot);
@@ -44,5 +48,5 @@ export function demoView(now = Date.now()) {
       ] : []),
     ], updatedAt: new Date(now).toISOString(), error: null, isLoading: false,
   }]));
-  return { snapshots, settings: { interval: 0, selection: 'all' }, refreshing: false, launchAtLogin: false, settingsError: null, title: title(snapshots), demo: true };
+  return { snapshots, settings: { interval: 0, selection: 'all', widget: false }, refreshing: false, launchAtLogin: false, settingsError: null, title: title(snapshots), demo: true };
 }

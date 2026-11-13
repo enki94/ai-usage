@@ -1,6 +1,7 @@
-import { providers, bounded, headline, statusText, title, resetLabel, demoView } from './model.js';
+import { providers, bounded, headline, headlineWindow, statusText, title, remaining, resetLabel, demoView } from './model.js';
 const byId = id => document.getElementById(id);
 const native = Boolean(window.__TAURI__?.core);
+const widgetMode = window.__TAURI__?.window?.getCurrentWindow?.().label === 'widget';
 const preview = !native && new URLSearchParams(location.search).get('demo') === '1';
 let state;
 let saving = false;
@@ -69,12 +70,40 @@ function render() {
   byId('interval').value = String(state.settings.interval);
   byId('startup').checked = state.launchAtLogin;
   byId('startup').disabled = saving || state.demo;
+  byId('widget-toggle').checked = Boolean(state.settings.widget);
+  byId('widget-toggle').disabled = saving;
   byId('selection').disabled = saving;
   byId('interval').disabled = saving;
   byId('quit').disabled = !native;
   const message = lastError || state.settingsError || (state.demo ? '예시 데이터입니다. 실제 사용량은 CLI 로그인 후 일반 모드에서 확인하세요.' : '');
   byId('notice').hidden = !message;
   byId('notice').textContent = message;
+  if (widgetMode) renderWidget();
+}
+function renderWidget() {
+  byId('widget-list').replaceChildren(...providers.map(provider => {
+    const snapshot = state.snapshots[provider.key];
+    const value = headline(snapshot);
+    const shortest = headlineWindow(snapshot);
+    const row = element('div', 'w-row');
+    const top = element('div', 'w-top');
+    top.append(element('span', 'w-badge ' + provider.key + '-color', provider.short), element('span', 'w-name', provider.name), element('strong', 'w-pct', statusText(snapshot)));
+    const bar = element('progress', value >= 90 ? 'danger' : value >= 70 ? 'warning' : '');
+    bar.max = 100; bar.value = value ?? 0;
+    bar.setAttribute('aria-label', provider.name + ' 사용률');
+    row.append(top, bar, element('div', 'w-reset', shortest ? remaining(shortest.resetAt) : '조회 전'));
+    return row;
+  }));
+}
+function startWidgetDrag(event) {
+  if (event.button !== 0 || event.target.closest('button')) return;
+  const current = window.__TAURI__?.window?.getCurrentWindow?.();
+  current?.startDragging().catch(() => {});
+}
+async function closeWidget() {
+  if (!state || saving) return;
+  try { state = await invoke('save_settings', { settings: { ...state.settings, widget: false } }); render(); }
+  catch (error) { showError(error); }
 }
 byId('refresh').addEventListener('click', async () => {
   if (state?.refreshing) return;
@@ -83,13 +112,14 @@ byId('refresh').addEventListener('click', async () => {
 });
 async function changeSettings() {
   if (!state || saving) return;
-  const settings = { selection: byId('selection').value, interval: Number(byId('interval').value) };
+  const settings = { selection: byId('selection').value, interval: Number(byId('interval').value), widget: byId('widget-toggle').checked };
   saving = true; lastError = ''; render();
   try { state = await invoke('save_settings', { settings }); } catch (error) { showError(error); }
   finally { saving = false; render(); }
 }
 byId('selection').addEventListener('change', changeSettings);
 byId('interval').addEventListener('change', changeSettings);
+byId('widget-toggle').addEventListener('change', changeSettings);
 byId('startup').addEventListener('change', async () => {
   if (!state || saving) return;
   const enabled = byId('startup').checked;
@@ -104,6 +134,13 @@ async function initialize() {
     if (native) await window.__TAURI__.event.listen('usage-changed', event => { state = event.payload; render(); });
     state = await invoke('get_state'); render();
   } catch (error) { showError(error); }
+}
+if (widgetMode) {
+  document.documentElement.classList.add('widget-mode');
+  document.body.classList.add('widget-mode');
+  byId('widget').hidden = false;
+  byId('widget').addEventListener('mousedown', startWidgetDrag);
+  byId('widget-close').addEventListener('click', closeWidget);
 }
 setInterval(() => { if (state && !document.hidden) render(); }, 60000);
 void initialize();

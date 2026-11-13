@@ -67,6 +67,23 @@ fn publish(app: &AppHandle) -> AppView {
     let _ = app.emit("usage-changed", &value);
     value
 }
+const WIDGET_WIDTH: f64 = 240.0;
+const WIDGET_MARGIN: f64 = 24.0;
+fn set_widget(app: &AppHandle, visible: bool) {
+    if let Some(window) = app.get_webview_window("widget") {
+        let _ = if visible { window.show() } else { window.hide() };
+    }
+}
+// Top-right of the primary monitor; the widget is not persisted across launches.
+fn place_widget(window: &tauri::WebviewWindow) {
+    if let Ok(Some(monitor)) = window.primary_monitor() {
+        let scale = monitor.scale_factor();
+        let origin = monitor.position();
+        let x = origin.x + monitor.size().width as i32 - (WIDGET_WIDTH * scale) as i32 - (WIDGET_MARGIN * scale) as i32;
+        let y = origin.y + (WIDGET_MARGIN * scale) as i32;
+        let _ = window.set_position(tauri::PhysicalPosition::new(x, y));
+    }
+}
 fn show(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.show();
@@ -156,6 +173,7 @@ async fn refresh_usage(app: AppHandle) -> Result<AppView, String> {
 fn save_settings(app: AppHandle, settings: Settings) -> Result<AppView, String> {
     let state = app.state::<AppState>();
     settings.validate()?;
+    let widget_visible = settings.widget;
     // Serialize settings writes and publish only after the disk write succeeds.
     {
         let mut data = state.data.lock().unwrap_or_else(|e| e.into_inner());
@@ -164,6 +182,7 @@ fn save_settings(app: AppHandle, settings: Settings) -> Result<AppView, String> 
         data.settings_error = None;
     }
     state.schedule.send_replace(settings.interval);
+    set_widget(&app, widget_visible);
     Ok(publish(&app))
 }
 #[tauri::command]
@@ -230,6 +249,7 @@ fn main() {
         .setup(move |app| {
             let path = app.path().app_local_data_dir()?.join("settings.json");
             let settings = Settings::load(&path);
+            let widget_visible = settings.widget;
             let status = app.autolaunch().is_enabled();
             let (schedule, mut interval) = tokio::sync::watch::channel(settings.interval);
             let client = client::client().map_err(std::io::Error::other)?;
@@ -263,6 +283,10 @@ fn main() {
                     if cfg!(target_os = "linux") || !tray_available { let _ = window_handle.minimize(); }
                     else { let _ = window_handle.hide(); } } });
             }
+            if let Some(widget) = app.get_webview_window("widget") {
+                place_widget(&widget);
+            }
+            set_widget(app.handle(), widget_visible);
             publish(app.handle());
             if !background || !tray_available || cfg!(target_os = "linux") { show(app.handle()); }
             let app = app.handle().clone();

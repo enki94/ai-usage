@@ -5,7 +5,7 @@ import vm from 'node:vm';
 import * as model from '../frontend/model.js';
 const source = (await readFile(new URL('../frontend/app.js', import.meta.url), 'utf8')).replace(/^import[^\n]*\n/, '');
 class Element {
-  constructor(tag = 'div') { this.tag = tag; this.children = []; this.listeners = {}; this.attributes = {}; this.hidden = false; this.value = ''; this.checked = false; this.classList = { toggle() {} }; }
+  constructor(tag = 'div') { this.tag = tag; this.children = []; this.listeners = {}; this.attributes = {}; this.hidden = false; this.value = ''; this.checked = false; this.classList = { toggle() {}, add() {} }; }
   append(...children) { this.children.push(...children); }
   replaceChildren(...children) { this.children = children; }
   addEventListener(name, callback) { this.listeners[name] = callback; }
@@ -13,7 +13,7 @@ class Element {
 }
 function texts(element) { return [element.textContent ?? '', ...element.children.flatMap(texts)].filter(Boolean); }
 async function dashboard(fixture, options = {}) {
-  const ids = Object.fromEntries(['refresh', 'status', 'summary', 'left', 'right', 'notice', 'selection', 'interval', 'startup', 'quit'].map(id => [id, new Element()]));
+  const ids = Object.fromEntries(['refresh', 'status', 'summary', 'left', 'right', 'notice', 'selection', 'interval', 'widget-toggle', 'startup', 'quit', 'widget', 'widget-list', 'widget-close'].map(id => [id, new Element()]));
   let listener;
   const calls = [];
   let current = structuredClone(fixture);
@@ -29,8 +29,8 @@ async function dashboard(fixture, options = {}) {
     if (command === 'set_launch_at_login') { current = { ...current, launchAtLogin: args.enabled }; return current; }
     throw new Error('Unexpected command ' + command);
   };
-  const document = { hidden: false, title: '', getElementById: id => ids[id], createElement: tag => new Element(tag), createTextNode: text => Object.assign(new Element('#text'), { textContent: text }) };
-  vm.runInNewContext(source, { ...model, document, window: { __TAURI__: { core: { invoke }, event: { listen: async (_, callback) => { listener = callback; } } } }, location: { search: '' }, setInterval() {}, setTimeout, URLSearchParams, Intl, Date, Number, Boolean, String, Promise });
+  const document = { hidden: false, title: '', documentElement: new Element('html'), body: new Element('body'), getElementById: id => ids[id], createElement: tag => new Element(tag), createTextNode: text => Object.assign(new Element('#text'), { textContent: text }) };
+  vm.runInNewContext(source, { ...model, document, window: { __TAURI__: { core: { invoke }, event: { listen: async (_, callback) => { listener = callback; } }, window: { getCurrentWindow: () => ({ label: options.label ?? 'main', startDragging: async () => {} }) } } }, location: { search: '' }, setInterval() {}, setTimeout, URLSearchParams, Intl, Date, Number, Boolean, String, Promise });
   await new Promise(resolve => setImmediate(resolve));
   return { ids, calls, document, event: data => listener({ payload: data }) };
 }
@@ -73,4 +73,26 @@ test('backend updates clear loading controls and retain stale marker', async () 
   event({ ...state, refreshing: true }); assert.equal(ids.refresh.disabled, true);
   state.snapshots.codex.error = '만료'; event(state);
   assert.equal(ids.refresh.disabled, false); assert.match(document.title, /X 37%\*/);
+});
+test('widget mode renders compact per-service usage without the main dashboard controls', async () => {
+  const state = model.demoView(); state.demo = false;
+  const { ids } = await dashboard(state, { label: 'widget' });
+  assert.equal(ids.widget.hidden, false);
+  assert.equal(ids['widget-list'].children.length, 3);
+  const text = texts(ids['widget-list']);
+  assert.ok(text.includes('37%') && text.includes('25%') && text.includes('72%'));
+  assert.ok(text.some(s => /^리셋 .*남음$/.test(s) || /남음$/.test(s)));
+});
+test('widget close hides the widget by saving widget:false', async () => {
+  const state = model.demoView(); state.demo = false; state.settings.widget = true;
+  const { ids, calls } = await dashboard(state, { label: 'widget' });
+  await ids['widget-close'].listeners.click();
+  const sent = calls.find(c => c.command === 'save_settings').args.settings;
+  assert.equal(sent.widget, false); assert.equal(sent.selection, 'all');
+});
+test('widget toggle in the main window sends widget flag with other settings', async () => {
+  const state = model.demoView(); state.demo = false;
+  const { ids, calls } = await dashboard(state);
+  ids['widget-toggle'].checked = true; await ids['widget-toggle'].listeners.change();
+  assert.equal(calls.find(c => c.command === 'save_settings').args.settings.widget, true);
 });

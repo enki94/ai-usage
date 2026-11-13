@@ -17,6 +17,19 @@
         "minWidth": 620,
         "minHeight": 480,
         "visible": false
+      },
+      {
+        "label": "widget",
+        "title": "AI Usage 위젯",
+        "width": 240,
+        "height": 172,
+        "resizable": false,
+        "decorations": false,
+        "transparent": true,
+        "shadow": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "visible": false
       }
     ],
     "security": {
