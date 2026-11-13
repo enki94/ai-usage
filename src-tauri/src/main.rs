@@ -71,7 +71,11 @@ const WIDGET_WIDTH: f64 = 240.0;
 const WIDGET_MARGIN: f64 = 24.0;
 fn set_widget(app: &AppHandle, visible: bool) {
     if let Some(window) = app.get_webview_window("widget") {
-        let _ = if visible { window.show() } else { window.hide() };
+        let _ = if visible {
+            window.show()
+        } else {
+            window.hide()
+        };
     }
 }
 // Top-right of the primary monitor; the widget is not persisted across launches.
@@ -79,7 +83,9 @@ fn place_widget(window: &tauri::WebviewWindow) {
     if let Ok(Some(monitor)) = window.primary_monitor() {
         let scale = monitor.scale_factor();
         let origin = monitor.position();
-        let x = origin.x + monitor.size().width as i32 - (WIDGET_WIDTH * scale) as i32 - (WIDGET_MARGIN * scale) as i32;
+        let x = origin.x + monitor.size().width as i32
+            - (WIDGET_WIDTH * scale) as i32
+            - (WIDGET_MARGIN * scale) as i32;
         let y = origin.y + (WIDGET_MARGIN * scale) as i32;
         let _ = window.set_position(tauri::PhysicalPosition::new(x, y));
     }
