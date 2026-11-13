@@ -22,7 +22,7 @@
         "label": "widget",
         "title": "AI Usage 위젯",
         "width": 240,
-        "height": 172,
+        "height": 212,
         "resizable": false,
         "decorations": false,
         "transparent": true,
