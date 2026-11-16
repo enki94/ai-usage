@@ -151,6 +151,62 @@ async fn antigravity_secret(account: &str) -> Result<Option<String>, String> {
     }
 }
 
+/// Runs `agy models` so the CLI renews the token in its own store; this app never writes there.
+pub async fn antigravity_cli_refresh() -> bool {
+    // An explicit auth file is not maintained by the CLI, so running it would not help.
+    if std::env::var_os("AI_USAGE_ANTIGRAVITY_AUTH").is_some_and(|v| !v.is_empty()) {
+        return false;
+    }
+    let mut programs = vec![std::path::PathBuf::from("agy")];
+    // Apps started at login may not have the installer's PATH entry yet.
+    #[cfg(windows)]
+    if let Some(dir) = dirs::data_local_dir() {
+        programs.push(dir.join("agy").join("bin").join("agy.exe"));
+    }
+    run_cli(programs, &["models"]).await
+}
+
+/// Runs `claude auth status` so Claude Code renews its own token; this app never writes there.
+pub async fn claude_cli_refresh() -> bool {
+    let mut programs = vec![std::path::PathBuf::from("claude")];
+    // npm installs a .cmd shim on Windows; the native installer uses ~/.local/bin.
+    #[cfg(windows)]
+    programs.push("claude.cmd".into());
+    if let Some(home) = dirs::home_dir() {
+        let name = if cfg!(windows) {
+            "claude.exe"
+        } else {
+            "claude"
+        };
+        programs.push(home.join(".local").join("bin").join(name));
+    }
+    run_cli(programs, &["auth", "status"]).await
+}
+
+/// Runs the first program that starts, hidden and without capturing output; true on exit code 0.
+async fn run_cli(programs: Vec<std::path::PathBuf>, args: &[&str]) -> bool {
+    use std::{process::Stdio, time::Duration};
+    for program in programs {
+        let mut command = tokio::process::Command::new(program);
+        command
+            .args(args)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .kill_on_drop(true);
+        #[cfg(windows)]
+        command.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+        let Ok(mut child) = command.spawn() else {
+            continue;
+        };
+        return matches!(
+            tokio::time::timeout(Duration::from_secs(30), child.wait()).await,
+            Ok(Ok(status)) if status.success()
+        );
+    }
+    false
+}
+
 fn config_path(
     provider: Provider,
     home: std::path::PathBuf,

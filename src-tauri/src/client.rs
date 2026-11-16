@@ -54,7 +54,14 @@ pub async fn fetch(client: &Client, provider: Provider) -> Result<Vec<UsageWindo
         }
         return Err(errors.join("\n"));
     }
-    let credential = credentials::read(provider, None).await?;
+    let mut credential = credentials::read(provider, None).await?;
+    // Claude Code only renews its ~8 hour token while it runs, so ask the CLI and re-read.
+    if provider == Provider::Claude
+        && claude_expired(&credential)
+        && credentials::claude_cli_refresh().await
+    {
+        credential = credentials::read(provider, None).await?;
+    }
     let codex = provider == Provider::Codex;
     let oauth = &credential[if codex { "tokens" } else { "claudeAiOauth" }];
     let token = text(oauth, if codex { "access_token" } else { "accessToken" })
@@ -74,29 +81,58 @@ pub async fn fetch(client: &Client, provider: Provider) -> Result<Vec<UsageWindo
     };
     usage::parse(&request(builder).await?, provider)
 }
-async fn antigravity(client: &Client, account: &str) -> Result<Vec<UsageWindow>, String> {
-    let credential = credentials::read(Provider::Antigravity, Some(account)).await?;
-    let token = credential
+/// `expiresAt` is epoch milliseconds; a missing value is treated as still valid.
+fn claude_expired(credential: &Value) -> bool {
+    credential["claudeAiOauth"]["expiresAt"]
+        .as_f64()
+        .is_some_and(|ms| ms <= (chrono::Utc::now().timestamp_millis() + 60_000) as f64)
+}
+fn antigravity_token(credential: &Value) -> &Value {
+    credential
         .get("token")
         .filter(|t| t.is_object())
-        .unwrap_or(&credential);
-    let mut access = text(token, "access_token").map(str::to_owned);
+        .unwrap_or(credential)
+}
+/// The stored access token, unless it is missing or expires within a minute.
+fn antigravity_access(credential: &Value) -> Option<String> {
+    let token = antigravity_token(credential);
     let expiry = usage::date(&token["expiry"]).or_else(|| usage::date(&token["expires_at"]));
-    if access.is_none()
-        || expiry.is_some_and(|e| e <= chrono::Utc::now() + chrono::Duration::seconds(60))
-    {
-        let refresh = text(token, "refresh_token")
-            .ok_or("토큰이 만료되었습니다. agy models 실행 후 새로고침해 주세요.")?;
-        let client_id = text(token, "client_id")
-            .or_else(|| text(&credential, "client_id"))
-            .ok_or("토큰을 갱신할 수 없습니다. agy models 실행 후 새로고침해 주세요.")?;
-        let secret = text(token, "client_secret")
-            .or_else(|| text(&credential, "client_secret"))
-            .unwrap_or("");
-        let renewed = request(client.post("https://oauth2.googleapis.com/token").json(&json!({"client_id":client_id,"client_secret":secret,"refresh_token":refresh,"grant_type":"refresh_token"}))).await?;
-        access = text(&renewed, "access_token").map(str::to_owned);
+    if expiry.is_some_and(|e| e <= chrono::Utc::now() + chrono::Duration::seconds(60)) {
+        return None;
     }
-    let access = access.ok_or("Antigravity access_token을 찾지 못했습니다.")?;
+    text(token, "access_token").map(str::to_owned)
+}
+async fn antigravity_renew(client: &Client, credential: &Value) -> Result<String, String> {
+    let token = antigravity_token(credential);
+    let refresh = text(token, "refresh_token")
+        .ok_or("토큰이 만료되었습니다. agy models 실행 후 새로고침해 주세요.")?;
+    let client_id = text(token, "client_id")
+        .or_else(|| text(credential, "client_id"))
+        .ok_or("토큰을 갱신할 수 없습니다. agy models 실행 후 새로고침해 주세요.")?;
+    let secret = text(token, "client_secret")
+        .or_else(|| text(credential, "client_secret"))
+        .unwrap_or("");
+    let renewed = request(client.post("https://oauth2.googleapis.com/token").json(&json!({"client_id":client_id,"client_secret":secret,"refresh_token":refresh,"grant_type":"refresh_token"}))).await?;
+    text(&renewed, "access_token")
+        .map(str::to_owned)
+        .ok_or_else(|| "Antigravity access_token을 찾지 못했습니다.".into())
+}
+async fn antigravity(client: &Client, account: &str) -> Result<Vec<UsageWindow>, String> {
+    let credential = credentials::read(Provider::Antigravity, Some(account)).await?;
+    let access = match antigravity_access(&credential) {
+        Some(access) => access,
+        None => match antigravity_renew(client, &credential).await {
+            Ok(access) => access,
+            // The CLI's own store has no client_id, so let the CLI renew its token and re-read it.
+            Err(error) => {
+                if !credentials::antigravity_cli_refresh().await {
+                    return Err(error);
+                }
+                let renewed = credentials::read(Provider::Antigravity, Some(account)).await?;
+                antigravity_access(&renewed).ok_or(error)?
+            }
+        },
+    };
     let mut errors = vec![];
     for host in [
         "daily-cloudcode-pa.googleapis.com",
@@ -114,6 +150,34 @@ async fn antigravity(client: &Client, account: &str) -> Result<Vec<UsageWindow>,
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn claude_expiry_uses_epoch_milliseconds() {
+        let now = chrono::Utc::now().timestamp_millis();
+        assert!(claude_expired(
+            &json!({"claudeAiOauth":{"expiresAt": now - 1}})
+        ));
+        assert!(claude_expired(
+            &json!({"claudeAiOauth":{"expiresAt": now + 30_000}})
+        ));
+        assert!(!claude_expired(
+            &json!({"claudeAiOauth":{"expiresAt": now + 3_600_000}})
+        ));
+        assert!(!claude_expired(&json!({"claudeAiOauth":{}})));
+    }
+    #[test]
+    fn antigravity_access_rejects_expired_tokens() {
+        let token = |expiry: &str| json!({"token":{"access_token":"a","expiry":expiry}});
+        assert_eq!(
+            antigravity_access(&token("2999-01-01T00:00:00Z")),
+            Some("a".into())
+        );
+        assert_eq!(antigravity_access(&token("2000-01-01T00:00:00Z")), None);
+        assert_eq!(
+            antigravity_access(&json!({"access_token":"a"})),
+            Some("a".into())
+        );
+        assert_eq!(antigravity_access(&json!({"token":{}})), None);
+    }
     #[test]
     fn status_hints() {
         assert!(http_error(StatusCode::UNAUTHORIZED).contains("인증이 만료"));

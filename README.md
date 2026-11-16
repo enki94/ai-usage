@@ -64,7 +64,7 @@ Linux의 트레이 표시는 데스크톱 환경에 따라 다르며 GNOME에서
 - Codex는 ChatGPT 계정 로그인 토큰이 필요합니다. API 키 전용 인증과 Windows에서 WSL 내부 인증은 자동으로 지원하지 않습니다.
 - Antigravity 저장 방식이 다른 경우 `AI_USAGE_ANTIGRAVITY_AUTH`에 기존 CLI 인증 JSON 파일 경로를 지정할 수 있습니다. 이 파일은 시스템 인증 저장소보다 우선합니다. JSON 최상위 또는 `token` 객체에 `access_token`을 사용하며, 갱신하려면 `refresh_token`, `client_id`와 필요한 경우 `client_secret`, `expiry` 또는 `expires_at`이 있어야 합니다.
 
-인증이 만료되면 해당 CLI에서 다시 로그인한 뒤 새로고침하세요. Antigravity는 필요한 정보가 있으면 토큰을 메모리에서 갱신하며, 갱신할 수 없으면 `agy models` 실행을 안내합니다. GUI로 실행한 앱은 터미널에서 설정한 환경 변수를 상속하지 않을 수 있습니다.
+인증이 만료되면 해당 CLI에서 다시 로그인한 뒤 새로고침하세요. Claude는 토큰이 만료되면 `claude auth status`를 백그라운드로 실행해 Claude Code가 자신의 토큰을 갱신하게 한 뒤 다시 읽습니다. Antigravity는 필요한 정보가 있으면 토큰을 메모리에서 갱신하고, 없으면 `agy models`를 백그라운드로 실행해 CLI가 자신의 토큰을 갱신하게 한 뒤 다시 읽습니다. `agy`를 찾지 못하거나 실패하면 `agy models` 실행을 안내합니다. GUI로 실행한 앱은 터미널에서 설정한 환경 변수를 상속하지 않을 수 있습니다.
 
 인증 저장소에는 쓰지 않습니다. 인증 정보와 HTTP 응답은 화면·로그·별도 파일에 저장하지 않으며, 사용량 캐시는 메모리에만 유지합니다. 새로고침 간격과 표시 서비스 설정은 운영체제의 앱 데이터 폴더에 저장합니다.
 
