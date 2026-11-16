@@ -62,12 +62,22 @@ pub struct Snapshot {
 }
 impl Snapshot {
     pub fn headline(&self) -> Option<f64> {
-        let short = self.windows.iter().any(|w| w.label == "5시간");
-        self.windows
-            .iter()
-            .filter(|w| !short || w.label == "5시간")
-            .map(UsageWindow::bounded_used)
-            .reduce(f64::max)
+        // Antigravity: the Gemini group's 5-hour window represents the service, not the busiest group.
+        let gemini = |w: &&UsageWindow| {
+            w.label == "5시간"
+                && w.group
+                    .as_deref()
+                    .is_some_and(|g| g.to_lowercase().starts_with("gemini"))
+        };
+        let max = |windows: Vec<&UsageWindow>| {
+            windows
+                .into_iter()
+                .map(UsageWindow::bounded_used)
+                .reduce(f64::max)
+        };
+        max(self.windows.iter().filter(gemini).collect())
+            .or_else(|| max(self.windows.iter().filter(|w| w.label == "5시간").collect()))
+            .or_else(|| max(self.windows.iter().collect()))
     }
     pub fn apply(&mut self, result: Result<Vec<UsageWindow>, String>) {
         self.is_loading = false;
@@ -211,14 +221,15 @@ mod tests {
         assert_eq!(windows[3].group.as_deref(), Some("Gemini 4 Argon"));
         assert_eq!(windows[3].label, "주간");
         assert!((windows[3].used - 18.0).abs() < 1e-9);
-        assert_eq!(
-            Snapshot {
-                windows,
-                ..Default::default()
-            }
-            .headline(),
-            Some(90.0)
-        );
+        // Gemini's 5-hour window wins over the busier Claude group.
+        let mut snapshot = Snapshot {
+            windows,
+            ..Default::default()
+        };
+        assert_eq!(snapshot.headline(), Some(25.0));
+        // Without a Gemini 5-hour window, the busiest 5-hour window is used.
+        snapshot.windows.remove(0);
+        assert_eq!(snapshot.headline(), Some(90.0));
     }
     #[test]
     fn invalid_is_not_zero() {

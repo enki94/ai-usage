@@ -7,6 +7,12 @@ test('headline selects maximum short window, with weekly fallback', () => {
   assert.equal(headline({ windows: [w('주간', 73)] }), 73);
   assert.equal(headline({ windows: [] }), null);
 });
+test('headline prefers the Gemini 5-hour window for Antigravity', () => {
+  const g = (group, label, used) => ({ group, label, used });
+  const claude = g('Claude and GPT models', '5시간', 79.1);
+  assert.equal(headline({ windows: [g('Gemini Models', '5시간', 19), g('Gemini Models', '주간', 8.4), claude, g('Gemini 4 Argon', '주간', 10)] }), 19);
+  assert.equal(headline({ windows: [claude, g('Gemini 4 Argon', '주간', 10)] }), 79.1);
+});
 test('values are bounded and nonfinite values are not displayed', () => {
   assert.equal(bounded(150), 100); assert.equal(bounded(-2), 0);
   assert.equal(bounded(NaN), 0); assert.equal(bounded(Infinity), 0);
@@ -31,9 +37,9 @@ test('reset countdown handles unknown, elapsed and fractional minutes', () => {
   assert.equal(remaining(at(1500), now), '1일 1시간 남음');
   assert.equal(resetLabel(null, now), '리셋 -');
 });
-test('preview explicitly marks sample data and uses group maximum', () => {
+test('preview explicitly marks sample data and uses the Gemini 5-hour window', () => {
   const sample = demoView(0);
   assert.equal(sample.demo, true); assert.equal(sample.launchAtLogin, false);
-  assert.equal(sample.title, 'C 25%  X 37%  A 72%');
+  assert.equal(sample.title, 'C 25%  X 37%  A 25%');
   assert.equal(sample.snapshots.antigravity.windows.length, 4);
 });

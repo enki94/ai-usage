@@ -7,7 +7,9 @@ export function bounded(value) { return Number.isFinite(value) ? Math.min(100, M
 export function headlineWindow(snapshot) {
   const windows = snapshot?.windows ?? [];
   const short = windows.filter(w => w.label === '5시간');
-  const selected = short.length ? short : windows;
+  // Antigravity: the Gemini group's 5-hour window represents the service, not the busiest group.
+  const gemini = short.filter(w => w.group?.toLowerCase().startsWith('gemini'));
+  const selected = gemini.length ? gemini : short.length ? short : windows;
   return selected.reduce((best, w) => (!best || bounded(w.used) > bounded(best.used) ? w : best), null);
 }
 export function headline(snapshot) {

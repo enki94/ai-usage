@@ -37,7 +37,7 @@ async function dashboard(fixture, options = {}) {
 test('dashboard renders provider identity, windows and sample notice', async () => {
   const { ids, document } = await dashboard(model.demoView());
   assert.equal(ids.left.children.length, 2); assert.equal(ids.right.children.length, 1);
-  assert.match(document.title, /C 25%  X 37%  A 72%/);
+  assert.match(document.title, /C 25%  X 37%  A 25%/);
   assert.ok(texts(ids.right).includes('Claude · 5시간'));
   assert.ok(texts(ids.right).includes('Gemini 4 Argon · 주간'));
   assert.equal(ids.startup.disabled, true);
@@ -80,7 +80,8 @@ test('widget mode renders compact per-service usage without the main dashboard c
   assert.equal(ids.widget.hidden, false);
   assert.equal(ids['widget-list'].children.length, 3);
   const text = texts(ids['widget-list']);
-  assert.ok(text.includes('37%') && text.includes('25%') && text.includes('72%'));
+  // Claude and Antigravity (Gemini 5-hour) both show 25%; the busier Claude group's 72% is not the headline.
+  assert.ok(text.includes('37%') && text.filter(s => s === '25%').length === 2 && !text.includes('72%'));
   assert.ok(text.some(s => /^리셋 .*남음$/.test(s) || /남음$/.test(s)));
 });
 test('widget close hides the widget by saving widget:false', async () => {
